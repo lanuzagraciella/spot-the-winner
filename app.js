@@ -330,7 +330,8 @@
     $("#review").innerHTML = st.rounds.map(({ p, flip }, k) => {
       const ok = st.answers[k] === p.win;
       const winNo = (flip ? ["b", "a"] : ["a", "b"]).indexOf(p.win) + 1;
-      return `<div class="rv"><span class="m ${ok ? "ok" : "no"}">${ok ? "✓" : "✗"}</span><div><b>${esc(p.title)}</b>: page ${winNo} won${p.provisional ? ' <span class="x">EXAMPLE PAIR, PLACEHOLDER ANSWER</span>' : ""}<p>${p.diff.replace(/<[^>]+>/g, "")}</p></div></div>`;
+      const myNo = (flip ? ["b", "a"] : ["a", "b"]).indexOf(st.answers[k]) + 1;
+      return `<div class="rv"><span class="m ${ok ? "ok" : "no"}">${ok ? "✓" : "✗"}</span><div><b>${esc(p.title)}</b>: you picked page ${myNo}, page ${winNo} won${p.provisional ? ' <span class="x">EXAMPLE PAIR, PLACEHOLDER ANSWER</span>' : ""}<p>${p.diff.replace(/<[^>]+>/g, "")}</p></div></div>`;
     }).join("");
     renderBoard(boardFallback(s));
   }

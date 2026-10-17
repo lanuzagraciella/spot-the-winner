@@ -410,23 +410,38 @@ function welcomeHtml(first, links) {
 }
 
 // ---------- full report email ----------
-// Pair titles, the winning version and why. Keep in sync with pages.js.
+// Each pair: title, version A, version B, and why the winner won. Keep in sync with pages.js.
 const PAIR_INFO = {
-  p01: ['The headline', 'The plain benefit headline', 'The scandal versions got more clicks but fewer buyers: curiosity clicks aren’t customers.'],
-  p02: ['The subtitle', 'The product-forward subtitle', 'Full dose, better form and a concrete outcome beat a novelty line.'],
-  p03: ['Social proof', 'The page with customer and review counts', 'Adding “12,000+ customers · 4.8 from 12,400 reviews” to the same promises sold more.'],
-  p04: ['The expert quote', 'Three punchy sentences', 'Same doctor, same message: short and plain beat a long clinical paragraph.'],
-  p05: ['Where the ad lands', 'Straight to the product page', 'For visitors ready to buy, skipping the article earned +39.5% revenue per click.'],
-  p06: ['The price', '$35', 'No cheaper price beat $35. A discount isn’t a free lift.'],
-  p07: ['Offer or expert?', 'The offer-led page', 'The expert angle converted about 57% worse and was cut.'],
-  p08: ['Bundle order', '3 bags + gift preselected', 'Same prices, different default: +4.9% revenue per visitor, all from bigger orders.'],
-  p09: ['Hero image', 'The lifestyle photo', 'Example pair: the answer is a placeholder until a real result is added.'],
-  p10: ['The guarantee', 'The 100-night trial', 'Example pair: the answer is a placeholder until a real result is added.'],
-  p11: ['Reviews position', 'Reviews right under the photo', 'Example pair: the answer is a placeholder until a real result is added.'],
-  p12: ['Free-shipping bar', 'The free-shipping bar', 'Example pair: the answer is a placeholder until a real result is added.'],
-  p13: ['Button text', '“Try it risk-free”', 'Example pair: the answer is a placeholder until a real result is added.'],
-  p14: ['Countdown timer', 'The countdown timer', 'Example pair: the answer is a placeholder until a real result is added.'],
-  p15: ['Video or photos', 'The video at the top', 'Example pair: the answer is a placeholder until a real result is added.'],
+  p01: ['The headline', 'the scandal headline (“The sleep scandal doctors don’t want you to know about”)', 'the benefit headline (“Why 12,000 adults switched to this 2-minute evening ritual”)',
+    'Scandal headlines pull in curious clickers who never planned to buy. The plain benefit headline got fewer clicks, but from people who wanted the product, so it earned more revenue per click.'],
+  p02: ['The subtitle', 'the novelty subtitle (“The internet’s favourite bedtime treat”)', 'the product-forward subtitle (“Full 300 mg magnesium glycinate dose, for deeper sleep in 2 weeks”)',
+    'Specifics answer the buyer’s real question: will this work for me? Dose, form, outcome and a timeframe give a reason to believe. A cute line gives none.'],
+  p03: ['Social proof', 'the promises on their own', 'the same promises plus “12,000+ customers · ★ 4.8 from 12,400 reviews”',
+    'Anyone can make promises. Numbers from real buyers make them believable and make trying the product feel less risky.'],
+  p04: ['The expert quote', 'the long clinical paragraph', 'the three short sentences',
+    'Visitors skim, mostly on phones. The short quote carries the same authority in three seconds; the jargon-heavy paragraph gets skipped, so the doctor adds nothing.'],
+  p05: ['Where the ad lands', 'the article first, then the product page', 'the ad going straight to the product page',
+    'For visitors already ready to buy, the article is one more step where people drop off. Going straight to the product page earned +39.5% revenue per click. Colder visitors can still need the article, which is why showing each visitor the right page matters.'],
+  p06: ['The price', '$30', '$35',
+    'The cheaper price didn’t bring in enough extra buyers to make up for $5 less on every order, so $35 made more money. A discount isn’t a free lift.'],
+  p07: ['Offer or expert?', 'the offer-led page (“Buy 2, get 1 free”)', 'the expert-angle page (a specialist video)',
+    'These visitors came from an ad and were ready for a deal. The expert video added a step and a delay before the offer, and converted about 57% worse.'],
+  p08: ['Bundle order', '2 bags preselected', '3 bags + free gift preselected',
+    'Most people keep whatever is preselected. Defaulting to the bigger bundle, with a gift as the reason, raised the average order: +4.9% revenue per visitor.'],
+  p09: ['Hero image', 'the product-only photo', 'the lifestyle photo (dog asleep on the bed)',
+    'A lifestyle photo lets buyers picture the result for their own dog, which a plain product shot can’t do. (Example pair: the winning side is a placeholder until a real test result is added.)'],
+  p10: ['The guarantee', 'the 30-day money-back guarantee', 'the 100-night home trial',
+    'A long home trial feels lower risk and fits a product you can only judge after weeks of use. (Example pair: the winning side is a placeholder until a real test result is added.)'],
+  p11: ['Reviews position', 'reviews at the bottom of the page', 'reviews right under the photo',
+    'Proof seen before the price and the button reassures people at the moment they decide. At the bottom, most visitors never reach it. (Example pair: the winning side is a placeholder until a real test result is added.)'],
+  p12: ['Free-shipping bar', 'no banner', 'the free-shipping bar on top',
+    'Surprise shipping costs are one of the top reasons people abandon checkout. Saying it’s free up front removes that doubt. (Example pair: the winning side is a placeholder until a real test result is added.)'],
+  p13: ['Button text', '“Buy now”', '“Try it risk-free”',
+    'The button reminds people of the guarantee right at the moment of doubt, so clicking feels safe. (Example pair: the winning side is a placeholder until a real test result is added.)'],
+  p14: ['Countdown timer', 'no timer', 'the countdown timer',
+    'A real deadline gives people a reason to act now instead of “later”, which usually means never. (Example pair: the winning side is a placeholder until a real test result is added.)'],
+  p15: ['Video or photos', 'the customer video at the top', 'the photo gallery',
+    'A short customer video shows the product in real use and builds trust faster than still photos. (Example pair: the winning side is a placeholder until a real test result is added.)'],
 };
 
 function sendReport(row, b, scans) {
@@ -463,11 +478,16 @@ function reportHtml(r) {
   const stat = (v, l) => `<td class="stack" width="33%" valign="top" style="padding-right:8px"><div style="${head};font-size:30px;line-height:1.1;color:#34E0A1">${v}</div><div style="${body};font-size:12.5px;color:#9DA4A2">${l}</div></td>`;
   const right = r.answers.filter((a) => ANSWER_KEY[a.q] === a.mine).length;
   const rows = r.answers.map((a, i) => {
-    const info = PAIR_INFO[a.q] || [a.q, '', ''];
-    const ok = ANSWER_KEY[a.q] === a.mine;
-    return `<tr><td valign="top" width="30" style="padding:12px 0;border-top:1px solid #1E4A39;${head};font-size:18px;color:${ok ? '#34E0A1' : '#FE5B3E'}">${ok ? '✓' : '✗'}</td>
-      <td style="padding:12px 0;border-top:1px solid #1E4A39;${body};font-size:14px;line-height:1.45;color:#C9D1CE">
-        <b style="color:#FFFDFC">${i + 1}. ${escapeHtml(info[0])}</b><br>Winner: <span style="color:#34E0A1">${escapeHtml(info[1])}</span><br><span style="color:#9DA4A2">${escapeHtml(info[2])}</span></td></tr>`;
+    const info = PAIR_INFO[a.q] || [a.q, 'version A', 'version B', ''];
+    const win = ANSWER_KEY[a.q], ok = win === a.mine;
+    const label = (side) => escapeHtml(side === 'a' ? info[1] : info[2]);
+    const verdict = ok
+      ? `<span style="color:#34E0A1;font-weight:700">Right!</span> You picked ${label(a.mine)}, the version that won.`
+      : `<span style="color:#FE5B3E;font-weight:700">Not quite.</span> You picked ${label(a.mine)}, but ${label(win)} won.`;
+    return `<tr><td valign="top" width="30" style="padding:14px 0;border-top:1px solid #1E4A39;${head};font-size:18px;color:${ok ? '#34E0A1' : '#FE5B3E'}">${ok ? '✓' : '✗'}</td>
+      <td style="padding:14px 0;border-top:1px solid #1E4A39;${body};font-size:14px;line-height:1.5;color:#C9D1CE">
+        <b style="color:#FFFDFC;font-size:15px">${i + 1}. ${escapeHtml(info[0])}</b><br>${verdict}
+        <div style="margin-top:8px;padding:10px 12px;border-radius:10px;background:#09120F;color:#C9D1CE"><b style="color:#34E0A1">Why it won:</b> ${escapeHtml(info[3])}</div></td></tr>`;
   }).join('');
   const tiers = [2, 5, 10].map((n) => {
     const on = r.scans >= n;
@@ -517,8 +537,12 @@ function reportText(r) {
     `${r.first}, you spotted ${right} of ${r.answers.length} winning landing pages.`,
     `Time: ${r.secs} s · Rank: ${r.rank ? '#' + r.rank : '-'}${r.players ? ' of ' + r.players : ''}`,
     '',
-    'EVERY ANSWER',
-    ...r.answers.map((a, i) => { const info = PAIR_INFO[a.q] || [a.q, '', '']; return `${ANSWER_KEY[a.q] === a.mine ? '✓' : '✗'} ${i + 1}. ${info[0]}: winner ${info[1]}. ${info[2]}`; }),
+    'EVERY ANSWER, EXPLAINED',
+    ...r.answers.map((a, i) => {
+      const info = PAIR_INFO[a.q] || [a.q, 'version A', 'version B', ''];
+      const win = ANSWER_KEY[a.q], ok = win === a.mine, label = (x) => (x === 'a' ? info[1] : info[2]);
+      return `${ok ? '✓' : '✗'} ${i + 1}. ${info[0]}\n   ${ok ? 'Right! You picked ' + label(a.mine) + ', the version that won.' : 'Not quite. You picked ' + label(a.mine) + ', but ' + label(win) + ' won.'}\n   Why it won: ${info[3]}\n`;
+    }),
     '',
     `QR rewards: ${r.scans} scans so far. Rewards unlock at 2, 5 and 10 scans.`,
     `Your QR code: ${r.links.qr}`,
