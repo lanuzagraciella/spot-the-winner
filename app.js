@@ -67,28 +67,39 @@
     flush();
   }
 
+  // Sends queued items one by one. An item the server can't take yet ("not registered",
+  // "not finished") is kept for a later round but never blocks the items behind it,
+  // and is dropped after 30 tries so an old leftover can't jam the queue for ever.
+  const DIAG = { last: "", error: "" };
   let flushing = null;
   function flush() {
     if (DEMO) return Promise.resolve();
     if (flushing) return flushing;
     flushing = (async () => {
+      let waiting = false, sentSomething = false;
       try {
-        let q = local(K.queue) || [];
-        let sentSomething = false;
-        while (q.length) {
-          const res = await fetch(CFG.SHEET_ENDPOINT, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(q[0]) });
+        const items = local(K.queue) || [];
+        for (const item of items) {
+          const res = await fetch(CFG.SHEET_ENDPOINT, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(item) });
           if (!res.ok) throw new Error("HTTP " + res.status);
-          const reply = await res.json().catch(() => ({ ok: true }));
-          // The result can arrive before its sign-up has landed: keep it and retry.
-          if (reply.ok === false && (reply.reason === "not_registered" || reply.reason === "not_finished")) throw new Error("waiting for sign-up");
-          if (q[0].action === "register" && reply.ref && st.player && !st.player.ref) { st.player.ref = reply.ref; savePlayer(); }
-          q = (local(K.queue) || []).slice(1);
-          local(K.queue, q);
-          sentSomething = true;
+          const text = await res.text();
+          let reply;
+          try { reply = JSON.parse(text); } catch (_) { throw new Error("Not JSON from the Sheet script: " + text.slice(0, 120)); }
+          DIAG.last = `${item.action} → ${JSON.stringify(reply).slice(0, 160)}`;
+          const keep = reply.ok === false && (reply.reason === "not_registered" || reply.reason === "not_finished") && (item.tries = (item.tries || 0) + 1) < 30;
+          if (keep) waiting = true;
+          if (item.action === "register" && reply.ref && st.player && !st.player.ref) { st.player.ref = reply.ref; savePlayer(); }
+          // Re-read the queue (new items may have arrived) and update or remove this one.
+          const q = (local(K.queue) || []).filter((x) => !(x.action === item.action && x.play_id === item.play_id && x.type === item.type && x.ref === item.ref && x.device_id === item.device_id));
+          local(K.queue, keep ? [...q, item] : q);
+          if (!keep) sentSomething = true;
         }
+        DIAG.error = "";
         setStatus("");
         if (sentSomething && (st.screen === "res" || st.screen === "report")) loadBoard();
-      } catch (_) {
+        if (waiting || (local(K.queue) || []).length) setTimeout(() => flush(), 10000);
+      } catch (err) {
+        DIAG.error = String(err && err.message || err);
         setStatus("Saving… we'll keep trying until you're back online.", true);
         setTimeout(() => flush(), 10000);
       } finally {
@@ -592,6 +603,22 @@
     renderReg();
   }
 
+  // Tester shortcut: add #debug to the address to see the connection to the Sheet.
+  function showDebug() {
+    if (location.hash !== "#debug") return;
+    const q = local(K.queue) || [];
+    const box = $("#debug") || document.body.appendChild(Object.assign(document.createElement("pre"), { id: "debug" }));
+    box.textContent = [
+      "Sheet endpoint: " + (CFG.SHEET_ENDPOINT ? CFG.SHEET_ENDPOINT.replace(/^(.{50}).*(.{10})$/, "$1…$2") : "(none: demo mode)"),
+      "Waiting to send: " + q.length + (q.length ? " (" + q.map((x) => x.action + (x.tries ? "×" + x.tries : "")).join(", ") + ")" : ""),
+      "Last reply: " + (DIAG.last || "(nothing sent yet)"),
+      "Last error: " + (DIAG.error || "(none)"),
+      "Online: " + navigator.onLine,
+    ].join("\n");
+    setTimeout(showDebug, 2000);
+  }
+  addEventListener("hashchange", showDebug);
+
   // Tester shortcut: open the link with #reset to become a first-time visitor again.
   function testerReset() {
     if (location.hash !== "#reset") return false;
@@ -669,6 +696,7 @@
       if (REF_IN) enqueue({ action: "scan", ref: REF_IN, device_id: DEVICE });
     }
     flush();
+    showDebug();
     if (testerReset()) return;
     renderReg();
     if (ME) {

@@ -327,3 +327,5 @@ h1, h2, h3 { margin: 0; letter-spacing: -.03em; text-wrap: balance; }
 .status.warn { color: var(--gold); }
 body.kiosk .no-kiosk { display: none !important; }
 body:not(.kiosk) .kiosk-only { display: none !important; }
+
+#debug { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 60; margin: 0; padding: 10px 12px; border-radius: 10px; background: #000; color: #9ef5d3; font: 12px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; border: 1px solid var(--accent); }
