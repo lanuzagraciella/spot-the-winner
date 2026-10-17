@@ -466,7 +466,7 @@
       : "All rewards unlocked. Legend!";
     $("#tiers").innerHTML = TIERS.map((t) => {
       const on = n >= t.at;
-      return `<div class="tier${on ? " on" : ""}${pop === t.at ? " pop" : ""}"><div class="ic">${on ? "🎁" : "❔"}</div><b>${t.at} scans</b>${on ? (t.at === 2 ? "Unlocked: discount code" : "Unlocked") : "Mystery reward"}</div>`;
+      return `<div class="tier${on ? " on" : ""}${pop === t.at ? " pop" : ""}"><div class="ic">🎁</div><b>${t.at} scans</b>${on ? (t.at === 2 ? "Unlocked: discount code" : "Unlocked") : "Unlock reward"}</div>`;
     }).join("");
     const top = TIERS.filter((t) => n >= t.at).pop();
     if (top && $("#reward").hidden) { $("#reward").innerHTML = rewardHTML(top); $("#reward").hidden = false; }

@@ -367,7 +367,7 @@ function welcomeHtml(first, links) {
         <p style="${body};font-size:15px;line-height:1.55;color:#C9D1CE;margin:0 0 20px">Every friend who opens the game from your QR on their own phone counts as a scan.</p>
       </div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-        ${tier(2, 'Mystery reward #1')}${tier(5, 'Mystery reward #2')}${tier(10, 'The big one')}
+        ${tier(2, 'Unlock reward')}${tier(5, 'Unlock reward')}${tier(10, 'Unlock reward')}
       </tr></table>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px"><tr><td align="center">
         <table role="presentation" cellpadding="0" cellspacing="0"><tr>
@@ -492,7 +492,7 @@ function reportHtml(r) {
   const tiers = [2, 5, 10].map((n) => {
     const on = r.scans >= n;
     return `<td width="33%" style="padding:0 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px ${on ? 'solid #34E0A1' : 'dashed #2E5A49'};border-radius:12px;background:${on ? '#123A2C' : '#09120F'}"><tr><td align="center" style="padding:12px 4px">
-      <div style="font-size:20px">${on ? '🎁' : '❔'}</div><div style="${head};font-size:20px;color:#FFFDFC">${n}</div><div style="${body};font-size:11px;color:#9DA4A2">${on ? 'UNLOCKED' : 'scans'}</div></td></tr></table></td>`;
+      <div style="font-size:20px">🎁</div><div style="${head};font-size:20px;color:#FFFDFC">${n}</div><div style="${body};font-size:11px;color:#9DA4A2">${on ? 'UNLOCKED' : 'scans'}</div></td></tr></table></td>`;
   }).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>Your full report</title>
