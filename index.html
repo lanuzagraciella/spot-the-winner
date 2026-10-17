@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#09120F">
+<title>Spot the Winner · Smart Funnels</title>
+<meta name="description" content="How many winning landing pages can you spot? 10 real A/B tests. Smart Funnels at Affiliate Grand Slam Rome.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="bgfx" aria-hidden="true"></div>
+
+<header class="pad">
+  <div class="brand"><div class="logo" aria-hidden="true"><div><i style="width:17px"></i><i style="width:12px"></i><i style="width:8px"></i></div></div><span>Smart Funnels</span></div>
+  <div class="hud">
+    <span class="rn qonly" id="rn"></span>
+    <span class="tchip qonly" role="timer" aria-label="Your time"><b class="tval">0.0</b>s</span>
+    <button class="iconbtn" id="snd" type="button" aria-label="Mute music" aria-pressed="false"><svg class="on" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg><svg class="off" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="w" d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></svg></button>
+  </div>
+</header>
+
+<main class="pad">
+  <!-- 1. Landing + registration -->
+  <section class="screen" id="s-reg">
+    <div class="reg">
+      <div>
+        <p class="eyebrow">Affiliate Grand Slam · Rome · 2–5 Nov</p>
+        <h1 class="h-big">How many <span class="accent">winning landing pages</span> can you spot?</h1>
+        <p class="lead">Pick the winner in 10 real A/B tests and see your score at the end.</p>
+        <div class="perks"><div class="perk"><b>10</b><span>real tests</span></div><div class="perk"><b>2 min</b><span>to play</span></div><div class="perk"><b>iPad</b><span>for the top score</span></div></div>
+      </div>
+      <div class="stack">
+        <div class="notice" id="resume-note" hidden><span>Your game is in progress, round <b id="resume-round"></b>.</span><button class="btn btn-p" type="button" id="btn-resume">Continue</button></div>
+        <div class="notice" id="played-note" hidden><span id="played-text"></span><button class="btn btn-p" type="button" id="btn-myresult">My score</button></div>
+        <div class="notice demo-note" id="demo-note" hidden><span><b>Demo preview.</b> Sign-ups here are not saved to the Google Sheet. Use the live game link to test sign-ups.</span></div>
+        <form class="form" id="form" novalidate>
+          <label>Full name<input type="text" id="f-name" name="name" autocomplete="name" required></label>
+          <label>Work email<input type="email" id="f-email" name="email" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" required></label>
+          <label>Store URL<input type="text" id="f-store" name="store" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="yourstore.com" required></label>
+          <label>Phone <small>(optional)</small><span class="phone"><select id="f-dial" aria-label="Country code"><option value="+39">🇮🇹 +39 · Italy</option></select><input type="tel" id="f-phone" inputmode="tel" autocomplete="tel-national"></span></label>
+          <label class="ck"><input type="checkbox" id="f-privacy" required><span>I agree to the <a href="#" data-cfg-href="PRIVACY_URL" target="_blank" rel="noopener">privacy policy</a>. Ecom Elevated Ltd (Smart Funnels) will email my score and any rewards I unlock.</span></label>
+          <label class="ck"><input type="checkbox" id="f-mkt"><span>Send me funnel-testing insights (optional).</span></label>
+          <p class="err" id="err" hidden></p>
+          <button class="btn btn-p" type="submit">Start the quiz →</button>
+        </form>
+        <div class="muted" style="font-size:13px">🏆 Most correct answers wins an iPad; the fastest time breaks ties. 🎁 Unlock mystery rewards with your QR.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="link" type="button" data-open="rules">Rules</button><button class="link" type="button" id="prefill" hidden>Fill with sample details (demo)</button></div>
+        <div class="friend" id="friend"><div class="qrbox" data-qr="https://smart-funnels.org/ags"></div><div><b>Let a friend scan this to play</b><div class="muted" style="font-size:13px">They play on their own phone</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Quiz -->
+  <section class="screen quiz" id="s-quiz" hidden>
+    <div>
+      <div class="bigclock"><b><span class="tval">0.0</span>s</b><span class="eyebrow">your time</span></div>
+      <div class="prog" id="prog"></div>
+      <p class="qmeta" id="qmeta"></p>
+      <h2 class="qtext" id="qtext" tabindex="-1"></h2>
+      <p class="hint">Press <kbd>1</kbd> or <kbd>2</kbd>, or click a page. Scroll a page to read it.</p>
+    </div>
+    <div>
+      <div class="pages" id="pages"></div>
+      <div class="locked-msg" id="locked" aria-live="polite">✓ LOCKED IN</div>
+    </div>
+  </section>
+
+  <!-- 3. Results -->
+  <section class="screen" id="s-res" hidden>
+    <div class="res">
+      <div class="stack" style="align-content:start">
+        <p class="eyebrow accent" id="r-title"></p>
+        <div style="font-size:24px;font-weight:700">You spotted</div>
+        <div class="score"><b id="r-score">0</b><span>of <span id="r-of">10</span> winners</span></div>
+        <div class="muted" style="font-size:16px">in <b style="color:var(--text)" id="r-time">0.0 s</b> · rank <b style="color:var(--text)" id="r-rank">#1</b> of <span id="r-players">312</span></div>
+        <button class="btn btn-p" type="button" data-go="qr">Unlock rewards with your QR →</button>
+        <button class="btn btn-g" type="button" data-go="report">See the full report</button>
+        <button class="btn btn-g kiosk-only" type="button" id="next-player">Next player</button>
+        <button class="link no-kiosk" type="button" id="again">Play again (only your first score counts)</button>
+        <p class="status" id="save-status"></p>
+      </div>
+      <div class="card"><h4>Leaderboard · who you're up against</h4><div class="lb" id="lb"></div><p class="muted" style="font-size:12.5px;margin:10px 0 0">Most correct wins; the fastest time breaks ties. Top 3 win the iPad and prizes <span data-cfg="WINNERS_ANNOUNCED"></span>. <span class="demo" data-demo-label hidden>Example data</span></p></div>
+      <div class="stack" style="align-content:start">
+        <div class="card"><h4>How this quiz is performing</h4><div class="stats" id="perf"></div></div>
+        <div class="card"><h4>Review my answers</h4><div class="review" id="review"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. QR rewards -->
+  <section class="screen" id="s-qr" hidden>
+    <div class="qrscreen">
+      <div class="stack">
+        <div class="qrbox myqr" id="myqr"></div>
+        <div class="share3"><button type="button" id="sh-share">Share</button><button type="button" id="sh-copy">Copy link</button><button type="button" id="sh-save">Save image</button></div>
+      </div>
+      <div class="stack">
+        <div><p class="eyebrow">Unlock rewards</p><h2 style="font-size:clamp(28px,7vw,46px);line-height:1.05;margin-top:6px">Share your QR. <span class="accent">Unlock mystery rewards.</span></h2></div>
+        <div class="card">
+          <div style="font-size:22px;font-weight:700"><span class="accent" id="scans">0</span> <span id="scans-word">people</span> scanned your QR code</div>
+          <div class="track"><i id="track"></i></div>
+          <div class="muted" id="nudge"></div>
+        </div>
+        <div class="tierrow" id="tiers"></div>
+        <div class="reward" id="reward" hidden></div>
+        <div class="muted" style="font-size:12.5px">A scan counts once per device, when the game opens from your QR. Your own scans don't count.</div>
+        <button class="btn btn-g" type="button" id="sim" hidden>Simulate a friend's scan <span class="demo">(demo only)</span></button>
+        <button class="btn btn-g kiosk-only" type="button" data-next>Next player</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="link" type="button" data-go="res">← Back to my score</button><button class="link" type="button" data-go="report">Full report</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Full report -->
+  <section class="screen" id="s-report" hidden>
+    <div class="stack">
+      <div><p class="eyebrow">Live report · <span id="rep-updated">updates every minute</span> <span class="demo" data-demo-label hidden>· example data</span></p><h2 style="font-size:clamp(28px,6vw,44px);margin-top:6px">How this quiz is performing</h2></div>
+      <div class="report-grid cols">
+        <div class="card"><h4>Funnel</h4><div class="bars" id="funnel"></div></div>
+        <div class="card"><h4>Score distribution</h4><div class="dist" id="dist"></div><div class="distx" id="distx"></div><p class="muted" style="font-size:13px;margin:10px 0 0" id="dist-note"></p></div>
+        <div class="card"><h4>Pairs and sharing</h4><div class="abt" id="pairstats"></div></div>
+      </div>
+      <div class="card"><h4>Leaderboard · all event</h4><div class="lb" id="lb2"></div></div>
+      <button class="link" type="button" data-go="res" style="justify-self:start">← Back to my score</button>
+    </div>
+  </section>
+</main>
+
+<div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Landing page full view">
+  <div class="viewer-top"><span id="v-title">Landing page 1</span><button class="iconbtn" type="button" id="v-close" aria-label="Close">✕</button></div>
+  <div class="viewer-page" id="v-page"></div>
+  <div class="viewer-bot"><button class="btn btn-p" type="button" id="v-pick">Choose this page</button></div>
+</div>
+
+<dialog id="rules" class="sheet">
+  <h3>Rules</h3>
+  <ul>
+    <li><b>How to win:</b> the most correct answers out of 10 wins. A tie goes to the fastest total time (time spent choosing), then the earliest finish.</li>
+    <li>One entry per email and store. Only your first finished game counts; replays are for fun.</li>
+    <li>Entries close <span id="rules-close"></span>. Winners are announced <span data-cfg="WINNERS_ANNOUNCED"></span> and by email.</li>
+    <li>Prizes: 1st iPad + free trial; 2nd and 3rd a prize + 1-month free trial.</li>
+    <li>QR rewards unlock at 2, 5 and 10 verified scans: one per device, when the game opens from your link. Your own scans don't count.</li>
+    <li>We email your sign-up confirmation and any rewards. Marketing emails only if you tick that box.</li>
+    <li>Smart Funnels staff and their families can't win. Brands shown are fictional; the results come from real tests.</li>
+  </ul>
+  <button class="btn btn-p" type="button" data-close>Got it</button>
+</dialog>
+<div class="toast" id="toast" hidden></div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script src="countries.js"></script>
+<script src="sound.js"></script>
+<script src="pages.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
