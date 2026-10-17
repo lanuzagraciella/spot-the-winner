@@ -21,7 +21,7 @@
  */
 
 const SETTINGS = {
-  GAME_URL: 'https://smart-funnels.org/ags',          // the live game address (QR codes and emails link here)
+  GAME_URL: 'https://spot-the-winner.vercel.app',          // the live game address (QR codes and emails link here)
   CLOSE_AT: new Date('2026-11-05T15:00:00+01:00'),    // entries close (Rome time)
   SEND_WELCOME_EMAIL: true,
   EMAIL_FROM_NAME: 'Smart Funnels',
@@ -43,7 +43,7 @@ const PLAYERS = 'Players';
 const HEAD = [
   'registered_at', 'play_id', 'name', 'email', 'store', 'phone', 'consent_privacy', 'consent_marketing',
   'ref_code', 'referred_by', 'device_id', 'device', 'kiosk', 'source', 'user_agent', 'welcome_email',
-  'finished_at', 'score', 'time_ms', 'questions', 'answers', 'eligible',
+  'finished_at', 'score', 'time_ms', 'questions', 'answers', 'eligible', 'report_email',
 ];
 const C = Object.fromEntries(HEAD.map((h, i) => [h, i + 1]));
 
@@ -81,6 +81,7 @@ function doPost(e) {
     if (p.action === 'result') return json(result(p));
     if (p.action === 'scan') return json(scan(p));
     if (p.action === 'event') return json(event(p));
+    if (p.action === 'report') return json(report(p));
     return json({ ok: false, reason: 'unknown_action' });
   } finally {
     lock.releaseLock();
@@ -109,7 +110,7 @@ function register(p) {
   sh.appendRow([
     new Date(), p.play_id, clean(p.name), email, store, "'" + String(p.phone || '').replace(/[^\d+]/g, ''),
     true, p.consent_marketing === true, ref, clean(p.referred_by), clean(p.device_id), clean(p.device),
-    p.kiosk === true, clean(p.source), clean(p.user_agent), mail, '', '', '', '', '', false,
+    p.kiosk === true, clean(p.source), clean(p.user_agent), mail, '', '', '', '', '', false, '',
   ]);
   return { ok: true, ref, email: mail };
 }
@@ -154,6 +155,27 @@ function event(p) {
   if (!type) return { ok: false, reason: 'invalid' };
   sheet('Events').appendRow([new Date(), type, clean(p.device_id), clean(p.ref)]);
   return { ok: true };
+}
+
+// Emails the player their full report. Only ever goes to the email the play was registered with.
+function report(p) {
+  const sh = sheet(PLAYERS);
+  const rows = data(sh);
+  const idx = rows.findIndex((r) => r[C.play_id - 1] === p.play_id);
+  if (idx < 0) return { ok: false, reason: 'not_registered' };
+  const row = rows[idx];
+  if (!row[C.finished_at - 1]) return { ok: false, reason: 'not_finished' }; // the browser retries
+  const sent = Number(String(row[C.report_email - 1]).replace(/\D/g, '')) || 0;
+  if (sent >= 3) return { ok: true, limited: true };
+  let status;
+  try {
+    sendReport(row, board(p.play_id), verifiedScans(row[C.ref_code - 1]));
+    status = 'sent ' + (sent + 1);
+  } catch (err) {
+    status = 'failed: ' + String(err).slice(0, 80);
+  }
+  sh.getRange(idx + 2, C.report_email, 1, 1).setValues([[status]]);
+  return { ok: true, email: status };
 }
 
 // ---------- GET ----------
@@ -385,6 +407,126 @@ function welcomeHtml(first, links) {
 </td></tr>
 </table>
 </body></html>`;
+}
+
+// ---------- full report email ----------
+// Pair titles, the winning version and why. Keep in sync with pages.js.
+const PAIR_INFO = {
+  p01: ['The headline', 'The plain benefit headline', 'The scandal versions got more clicks but fewer buyers: curiosity clicks aren’t customers.'],
+  p02: ['The subtitle', 'The product-forward subtitle', 'Full dose, better form and a concrete outcome beat a novelty line.'],
+  p03: ['Social proof', 'The page with customer and review counts', 'Adding “12,000+ customers · 4.8 from 12,400 reviews” to the same promises sold more.'],
+  p04: ['The expert quote', 'Three punchy sentences', 'Same doctor, same message: short and plain beat a long clinical paragraph.'],
+  p05: ['Where the ad lands', 'Straight to the product page', 'For visitors ready to buy, skipping the article earned +39.5% revenue per click.'],
+  p06: ['The price', '$35', 'No cheaper price beat $35. A discount isn’t a free lift.'],
+  p07: ['Offer or expert?', 'The offer-led page', 'The expert angle converted about 57% worse and was cut.'],
+  p08: ['Bundle order', '3 bags + gift preselected', 'Same prices, different default: +4.9% revenue per visitor, all from bigger orders.'],
+  p09: ['Hero image', 'The lifestyle photo', 'Example pair: the answer is a placeholder until a real result is added.'],
+  p10: ['The guarantee', 'The 100-night trial', 'Example pair: the answer is a placeholder until a real result is added.'],
+  p11: ['Reviews position', 'Reviews right under the photo', 'Example pair: the answer is a placeholder until a real result is added.'],
+  p12: ['Free-shipping bar', 'The free-shipping bar', 'Example pair: the answer is a placeholder until a real result is added.'],
+  p13: ['Button text', '“Try it risk-free”', 'Example pair: the answer is a placeholder until a real result is added.'],
+  p14: ['Countdown timer', 'The countdown timer', 'Example pair: the answer is a placeholder until a real result is added.'],
+  p15: ['Video or photos', 'The video at the top', 'Example pair: the answer is a placeholder until a real result is added.'],
+};
+
+function sendReport(row, b, scans) {
+  const first = String(row[C.name - 1]).trim().split(/\s+/)[0];
+  const ref = row[C.ref_code - 1];
+  const r = {
+    first, scans,
+    score: Number(row[C.score - 1]) || 0,
+    secs: ((Number(row[C.time_ms - 1]) || 0) / 1000).toFixed(1),
+    rank: b.me ? b.me.rank : null,
+    players: b.players,
+    avg: b.avg,
+    answers: String(row[C.questions - 1]).split(',').map((q, i) => ({ q, mine: String(row[C.answers - 1]).split(',')[i] })),
+    links: { qr: `${SETTINGS.GAME_URL}?me=${encodeURIComponent(ref)}`, friend: `${SETTINGS.GAME_URL}?ref=${encodeURIComponent(ref)}` },
+  };
+  const opts = {
+    to: row[C.email - 1],
+    subject: `${first}, you spotted ${r.score} of ${SETTINGS.ROUNDS} winners: your full report`,
+    htmlBody: reportHtml(r),
+    body: reportText(r),
+    name: SETTINGS.EMAIL_FROM_NAME,
+  };
+  if (SETTINGS.EMAIL_REPLY_TO) opts.replyTo = SETTINGS.EMAIL_REPLY_TO;
+  MailApp.sendEmail(opts);
+}
+
+function reportHtml(r) {
+  const head = "font-family:'Space Grotesk',Arial,Helvetica,sans-serif;font-weight:700";
+  const body = 'font-family:Inter,Arial,Helvetica,sans-serif';
+  const qr = escapeHtml(r.links.qr), friend = escapeHtml(r.links.friend);
+  const bar = (w) => `<tr><td align="center" style="padding:2px 0"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="${w}" height="4" style="background:#090B0A;border-radius:2px;font-size:0;line-height:0">&nbsp;</td></tr></table></td></tr>`;
+  const card = (inner, bg) => `<tr><td bgcolor="${bg || '#0A1C15'}" style="background:${bg || '#0A1C15'};border:1px solid #1E4A39;border-radius:22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="px" style="padding:30px 36px">${inner}</td></tr></table></td></tr><tr><td height="14" style="font-size:0;line-height:0">&nbsp;</td></tr>`;
+  const eyebrow = (t) => `<div style="${body};font-size:12px;font-weight:600;letter-spacing:2.5px;color:#9DA4A2">${t}</div>`;
+  const stat = (v, l) => `<td class="stack" width="33%" valign="top" style="padding-right:8px"><div style="${head};font-size:30px;line-height:1.1;color:#34E0A1">${v}</div><div style="${body};font-size:12.5px;color:#9DA4A2">${l}</div></td>`;
+  const right = r.answers.filter((a) => ANSWER_KEY[a.q] === a.mine).length;
+  const rows = r.answers.map((a, i) => {
+    const info = PAIR_INFO[a.q] || [a.q, '', ''];
+    const ok = ANSWER_KEY[a.q] === a.mine;
+    return `<tr><td valign="top" width="30" style="padding:12px 0;border-top:1px solid #1E4A39;${head};font-size:18px;color:${ok ? '#34E0A1' : '#FE5B3E'}">${ok ? '✓' : '✗'}</td>
+      <td style="padding:12px 0;border-top:1px solid #1E4A39;${body};font-size:14px;line-height:1.45;color:#C9D1CE">
+        <b style="color:#FFFDFC">${i + 1}. ${escapeHtml(info[0])}</b><br>Winner: <span style="color:#34E0A1">${escapeHtml(info[1])}</span><br><span style="color:#9DA4A2">${escapeHtml(info[2])}</span></td></tr>`;
+  }).join('');
+  const tiers = [2, 5, 10].map((n) => {
+    const on = r.scans >= n;
+    return `<td width="33%" style="padding:0 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px ${on ? 'solid #34E0A1' : 'dashed #2E5A49'};border-radius:12px;background:${on ? '#123A2C' : '#09120F'}"><tr><td align="center" style="padding:12px 4px">
+      <div style="font-size:20px">${on ? '🎁' : '❔'}</div><div style="${head};font-size:20px;color:#FFFDFC">${n}</div><div style="${body};font-size:11px;color:#9DA4A2">${on ? 'UNLOCKED' : 'scans'}</div></td></tr></table></td>`;
+  }).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>Your full report</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>@media (max-width:620px){.wrap{width:100%!important}.px{padding-left:20px!important;padding-right:20px!important}.h1{font-size:30px!important}.stack{display:block!important;width:100%!important;padding:0 0 12px!important}.wm{font-size:16px!important}}</style>
+</head><body style="margin:0;padding:0;background:#060B09">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#060B09">Every answer explained, your rank, and your QR rewards.&nbsp;&#847;&nbsp;&#847;&nbsp;&#847;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#060B09" style="background:#060B09"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px">
+  <tr><td class="px" style="padding:4px 8px 20px"><table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td width="34" height="34" valign="middle" style="background:#169E79;border-radius:9px"><table role="presentation" width="34" cellpadding="0" cellspacing="0">${bar(22)}${bar(16)}${bar(11)}</table></td>
+    <td class="wm" style="${head};font-size:19px;color:#FFFDFC;padding-left:10px;white-space:nowrap">Smart Funnels</td></tr></table></td></tr>
+
+  ${card(`${eyebrow('YOUR FULL REPORT')}
+    <h1 class="h1" style="${head};font-size:38px;line-height:1.08;letter-spacing:-1px;color:#FFFDFC;margin:12px 0 18px">${escapeHtml(r.first)}, you spotted <span style="color:#34E0A1">${right} of ${r.answers.length}</span> winning landing pages.</h1>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${stat(r.secs + ' s', 'your time')}${stat(r.rank ? '#' + r.rank : '–', r.players ? 'rank of ' + r.players + ' players' : 'rank')}${stat(r.avg != null ? Number(r.avg).toFixed(1) : '–', 'average score')}</tr></table>
+    <div style="${body};font-size:13.5px;line-height:1.5;color:#9DA4A2;padding-top:14px">Most correct answers wins the iPad; the fastest time breaks ties. Winners are announced at our booth on 5 November and by email.</div>`, '#0C2A1D')}
+
+  ${card(`${eyebrow('EVERY ANSWER, EXPLAINED')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px">${rows}</table>`)}
+
+  ${card(`${eyebrow('BONUS')}
+    <h2 style="${head};font-size:24px;line-height:1.2;color:#FFFDFC;margin:10px 0 6px">${r.scans} ${r.scans === 1 ? 'friend has' : 'friends have'} scanned your QR. <span style="color:#34E0A1">Keep going.</span></h2>
+    <div style="${body};font-size:14px;line-height:1.5;color:#C9D1CE;margin-bottom:16px">Mystery rewards unlock at 2, 5 and 10 scans.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${tiers}</tr></table>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:20px"><tr><td bgcolor="#34E0A1" style="border-radius:12px;background:#34E0A1">
+      <a href="${qr}" style="${head};display:inline-block;font-size:16px;color:#060B09;text-decoration:none;padding:15px 26px;border-radius:12px">Open my QR code</a></td></tr></table>
+    <div style="${body};font-size:12px;color:#6F7A76;padding-top:10px;word-break:break-all">Link to send friends: <a href="${friend}" style="color:#9DA4A2">${friend}</a></div>`, '#09120F')}
+
+  ${card(`<div style="text-align:center"><div style="${head};font-size:24px;line-height:1.2;color:#FFFDFC">Guessing is hard. <span style="color:#34E0A1">Smart Funnels tests it for you.</span></div>
+    <div style="${body};font-size:14.5px;line-height:1.6;color:#C9D1CE;margin:12px auto 20px;max-width:440px">We test many versions of your landing pages at once and show each visitor the one most likely to convert, so you keep the winners without guessing.</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr><td style="border:1.5px solid #34E0A1;border-radius:12px">
+      <a href="${escapeHtml(SETTINGS.BRAND_URL)}" style="${head};display:inline-block;font-size:15px;color:#34E0A1;text-decoration:none;padding:13px 22px">Visit ${escapeHtml(SETTINGS.BRAND_URL.replace(/^https?:\/\//, ''))}</a></td></tr></table></div>`, '#0C2A1D')}
+
+  <tr><td class="px" align="center" style="padding:14px 30px 8px;${body};font-size:12px;line-height:1.6;color:#6F7A76">
+    You asked for this report after playing at the Smart Funnels booth. Brands shown in the game are fictional.<br><br>${escapeHtml(SETTINGS.COMPANY_LINE)}</td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+function reportText(r) {
+  const right = r.answers.filter((a) => ANSWER_KEY[a.q] === a.mine).length;
+  return [
+    `${r.first}, you spotted ${right} of ${r.answers.length} winning landing pages.`,
+    `Time: ${r.secs} s · Rank: ${r.rank ? '#' + r.rank : '-'}${r.players ? ' of ' + r.players : ''}`,
+    '',
+    'EVERY ANSWER',
+    ...r.answers.map((a, i) => { const info = PAIR_INFO[a.q] || [a.q, '', '']; return `${ANSWER_KEY[a.q] === a.mine ? '✓' : '✗'} ${i + 1}. ${info[0]}: winner ${info[1]}. ${info[2]}`; }),
+    '',
+    `QR rewards: ${r.scans} scans so far. Rewards unlock at 2, 5 and 10 scans.`,
+    `Your QR code: ${r.links.qr}`,
+    `Link to send friends: ${r.links.friend}`,
+    '',
+    `Smart Funnels: ${SETTINGS.BRAND_URL}`,
+    SETTINGS.COMPANY_LINE,
+  ].join('\n');
 }
 
 function welcomeText(first, links) {

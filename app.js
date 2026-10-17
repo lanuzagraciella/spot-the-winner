@@ -10,7 +10,7 @@
   const DEMO = !CFG.SHEET_ENDPOINT;
   const GAME_URL = CFG.GAME_URL || location.origin + location.pathname;
 
-  const K = { queue: "sf_spot_queue_v1", player: "sf_spot_player_v1", progress: "sf_spot_progress_v1", device: "sf_spot_device_v1", seen: "sf_spot_seen_v1", muted: "sf_games_muted_v1" };
+  const K = { queue: "sf_spot_queue_v1", player: "sf_spot_player_v1", progress: "sf_spot_progress_v1", device: "sf_spot_device_v1", seen: "sf_spot_seen_v1", qrSeen: "sf_spot_qrseen_v1", muted: "sf_games_muted_v1" };
 
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => [...document.querySelectorAll(s)];
@@ -47,8 +47,9 @@
     scrollTo({ top: 0, behavior: "instant" });
     kioskIdle();
     clearInterval(show.poll);
-    if (name === "qr") { refreshQR(); show.poll = setInterval(refreshQR, 20000); }
-    if ((name === "res" || name === "report") && !DEMO) show.poll = setInterval(loadBoard, 30000);
+    if (name === "res" || name === "qr") placeQR(name);
+    if (name === "qr" || name === "res") { refreshQR(); show.poll = setInterval(() => { refreshQR(); if (name === "res" && !DEMO) loadBoard(); }, 20000); }
+    if (name === "report" && !DEMO) show.poll = setInterval(loadBoard, 30000);
   }
 
   function toast(msg) {
@@ -79,7 +80,7 @@
           if (!res.ok) throw new Error("HTTP " + res.status);
           const reply = await res.json().catch(() => ({ ok: true }));
           // The result can arrive before its sign-up has landed: keep it and retry.
-          if (reply.ok === false && reply.reason === "not_registered") throw new Error("waiting for sign-up");
+          if (reply.ok === false && (reply.reason === "not_registered" || reply.reason === "not_finished")) throw new Error("waiting for sign-up");
           if (q[0].action === "register" && reply.ref && st.player && !st.player.ref) { st.player.ref = reply.ref; savePlayer(); }
           q = (local(K.queue) || []).slice(1);
           local(K.queue, q);
@@ -122,23 +123,24 @@
   }
 
   // ---------- QR codes ----------
+  // Real, scannable QR codes drawn locally (assets/qrcode.js, MIT), so they work even on weak venue Wi-Fi.
   function drawQR(el, text) {
     el.innerHTML = "";
-    if (window.QRCode) {
-      new QRCode(el, { text, width: 512, height: 512, colorDark: "#0b1210", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
-      return;
-    }
-    let s = [...text].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 233280, 7);
-    const r = () => (s = (s * 9301 + 49297) % 233280) / 233280;
-    let cells = "";
-    for (let y = 0; y < 25; y++) for (let x = 0; x < 25; x++) {
-      const f = (x < 7 && y < 7) || (x > 17 && y < 7) || (x < 7 && y > 17);
-      const fx = x > 17 ? x - 18 : x, fy = y > 17 ? y - 18 : y;
-      const on = f ? (fx === 0 || fx === 6 || fy === 0 || fy === 6 || (fx > 1 && fx < 5 && fy > 1 && fy < 5)) : r() > .52;
-      if (on) cells += `<rect x="${x}" y="${y}" width="1" height="1"/>`;
-    }
-    el.innerHTML = `<svg viewBox="0 0 25 25" shape-rendering="crispEdges" fill="#0b1210">${cells}</svg>`;
+    const qr = window.qrcode(0, "M");
+    qr.addData(text);
+    qr.make();
+    const n = qr.getModuleCount(), quiet = 2, cell = Math.ceil(600 / (n + quiet * 2));
+    const c = document.createElement("canvas");
+    c.width = c.height = (n + quiet * 2) * cell;
+    const x = c.getContext("2d");
+    x.fillStyle = "#ffffff"; x.fillRect(0, 0, c.width, c.height);
+    x.fillStyle = "#0b1210";
+    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) x.fillRect((k + quiet) * cell, (r + quiet) * cell, cell, cell);
+    c.setAttribute("role", "img");
+    c.setAttribute("aria-label", "QR code");
+    el.appendChild(c);
   }
+
 
   // ---------- registration ----------
   function savePlayer() { local(K.player, st.player); }
@@ -320,6 +322,7 @@
   }
 
   function renderResult(s) {
+    $$("#email-report, [data-email-report]").forEach((b) => { b.disabled = false; b.textContent = b.id ? "✉ Email me my full report" : "✉ Email me this report"; });
     $("#r-title").textContent = s >= 9 ? "Conversion assassin" : s >= 7 ? "Sharp optimizer" : s >= 5 ? "Rising tester" : "Funnel rookie";
     $("#r-score").textContent = s;
     $("#r-of").textContent = ROUNDS;
@@ -420,12 +423,26 @@
   ];
   const myLink = () => `${GAME_URL}?ref=${encodeURIComponent(st.player && st.player.ref ? st.player.ref : "")}`;
 
-  function openQR() {
-    show("qr");
-    if (!DEMO) enqueue({ action: "event", type: "qr_open", device_id: DEVICE, ref: st.player && st.player.ref });
-    drawQR($("#myqr"), myLink());
+  // One QR panel, shown on the score screen and on its own screen (opened from the welcome email).
+  function placeQR(where) {
+    $(where === "qr" ? "#qr-slot-qr" : "#qr-slot-res").appendChild($("#qrpanel"));
+    const link = myLink();
+    if (placeQR.drawn !== link) { drawQR($("#myqr"), link); placeQR.drawn = link; }
     renderTiers();
+    if (!DEMO && !session(K.qrSeen)) { session(K.qrSeen, 1); enqueue({ action: "event", type: "qr_open", device_id: DEVICE, ref: st.player && st.player.ref }); }
   }
+  function openQR() { show("qr"); }
+
+  // ---------- full report by email ----------
+  function emailReport() {
+    const btns = $$("#email-report, [data-email-report]");
+    if (DEMO) return toast("Demo preview: no email is sent.");
+    if (!st.player || !st.playId) return;
+    enqueue({ action: "report", play_id: st.playId });
+    btns.forEach((b) => { b.disabled = true; b.textContent = "✓ Report on its way to your inbox"; });
+    toast(`Sending your full report to ${st.player.email}`);
+  }
+  $$("#email-report, [data-email-report]").forEach((b) => b.addEventListener("click", emailReport));
   async function refreshQR() {
     if (DEMO || !st.player || !st.player.ref) return renderTiers();
     const data = await getJSON({ action: "qr", ref: st.player.ref });
@@ -462,22 +479,72 @@
     renderTiers(hit && hit.at);
     if (hit) celebrate(hit);
   });
+  // ---------- sharing (phones first: WhatsApp, the share sheet, a branded image) ----------
+  const SHARE_TEXT = "How many winning landing pages can you spot? Play the Smart Funnels challenge with my link:";
+  $("#sh-wa").addEventListener("click", () => {
+    window.open("https://wa.me/?text=" + encodeURIComponent(`${SHARE_TEXT} ${myLink()}`), "_blank", "noopener");
+  });
   $("#sh-copy").addEventListener("click", () => {
     navigator.clipboard.writeText(myLink()).then(() => toast("Link copied"), () => toast(myLink()));
   });
+  // A portrait card with the QR, ready for WhatsApp status, Instagram stories and chats.
+  async function shareImage() {
+    const qr = $("#myqr canvas") || $("#myqr img");
+    if (!qr) return null;
+    const W = 1080, H = 1350, c = document.createElement("canvas"), x = c.getContext("2d");
+    c.width = W; c.height = H;
+    const g = x.createRadialGradient(W, 0, 60, W * .6, H * .4, H);
+    g.addColorStop(0, "#14402F"); g.addColorStop(.45, "#0C2A1D"); g.addColorStop(1, "#060B09");
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    x.strokeStyle = "rgba(52,224,161,.06)"; x.lineWidth = 2;
+    for (let i = 0; i < W; i += 54) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); }
+    for (let i = 0; i < H; i += 54) { x.beginPath(); x.moveTo(0, i); x.lineTo(W, i); x.stroke(); }
+    try { await document.fonts.ready; } catch (_) {}
+    const font = (w, s) => `${w} ${s}px "Space Grotesk", Arial, sans-serif`;
+    x.textAlign = "center";
+    x.fillStyle = "#34E0A1"; x.font = font(600, 30); x.fillText("SMART FUNNELS · AFFILIATE GRAND SLAM ROME", W / 2, 110);
+    x.fillStyle = "#FFFDFC"; x.font = font(700, 74); x.fillText("How many winning", W / 2, 220);
+    x.fillStyle = "#34E0A1"; x.fillText("landing pages", W / 2, 302);
+    x.fillStyle = "#FFFDFC"; x.fillText("can you spot?", W / 2, 384);
+    const S = 560, X = (W - S) / 2, Y = 450;
+    x.fillStyle = "#fff"; x.beginPath(); (x.roundRect ? x.roundRect(X - 30, Y - 30, S + 60, S + 60, 36) : x.rect(X - 30, Y - 30, S + 60, S + 60)); x.fill();
+    x.imageSmoothingEnabled = false; x.drawImage(qr, X, Y, S, S);
+    x.fillStyle = "#FFFDFC"; x.font = font(700, 44); x.fillText("Scan to play. Beat my score!", W / 2, 1150);
+    x.fillStyle = "#9DA4A2"; x.font = font(500, 30); x.fillText(myLink().replace(/^https?:\/\//, ""), W / 2, 1210);
+    return new Promise((res) => c.toBlob((b) => res(b), "image/png"));
+  }
   $("#sh-share").addEventListener("click", async () => {
-    const data = { title: "Spot the Winner", text: "How many winning landing pages can you spot? Play with my link:", url: myLink() };
-    if (navigator.share) { try { await navigator.share(data); } catch (_) {} } else { $("#sh-copy").click(); }
-  });
-  $("#sh-save").addEventListener("click", () => {
-    const c = $("#myqr canvas");
+    const data = { title: "Spot the Winner", text: SHARE_TEXT, url: myLink() };
+    if (!navigator.share) return $("#sh-copy").click();
     try {
-      const a = document.createElement("a");
-      a.href = c ? c.toDataURL("image/png") : "data:image/svg+xml," + encodeURIComponent($("#myqr").innerHTML);
-      a.download = "my-spot-the-winner-qr.png";
-      a.click();
-    } catch (_) { toast("Long-press the QR code to save it."); }
+      const blob = await shareImage();
+      const file = blob && new File([blob], "spot-the-winner-qr.png", { type: "image/png" });
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ ...data, files: [file] });
+      else await navigator.share(data);
+    } catch (_) {}
   });
+  $("#sh-save").addEventListener("click", async () => {
+    try {
+      const blob = await shareImage();
+      if (!blob) throw new Error("no qr");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "spot-the-winner-qr.png";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    } catch (_) { toast("Tap the QR code, then long-press it to save."); }
+  });
+
+  // Tap any QR code to show it full screen, so a friend can scan it from your phone.
+  function zoomQR(link, title) {
+    $("#qz-title").textContent = title;
+    drawQR($("#qz-code"), link);
+    $("#qrzoom").hidden = false;
+  }
+  $("#qz-close").addEventListener("click", () => ($("#qrzoom").hidden = true));
+  $("#qrzoom").addEventListener("click", (e) => { if (e.target.id === "qrzoom") $("#qrzoom").hidden = true; });
+  $("#myqr").addEventListener("click", () => zoomQR(myLink(), "Ask your friend to scan this"));
+  $$("[data-qr]").forEach((el) => el.addEventListener("click", () => zoomQR(GAME_URL, "Scan to play")));
 
   // ---------- returning players, resume, reset ----------
   function showMyResult() {
@@ -517,6 +584,8 @@
     $("#form").reset();
     $("#reward").hidden = true;
     st.scans = 0;
+    placeQR.drawn = null;
+    $$("#email-report, [data-email-report]").forEach((b) => { b.disabled = false; b.textContent = b.id ? "✉ Email me my full report" : "✉ Email me this report"; });
     SND.stopMusic();
     if ($("#rules").open) $("#rules").close();
     renderReg();

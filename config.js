@@ -6,7 +6,7 @@ window.SF_CONFIG = {
 
   // The live game address, used in players' QR codes and share links.
   // Empty = the address the game is opened from.
-  GAME_URL: "",
+  GAME_URL: "https://spot-the-winner.vercel.app",
 
   // Entries close (Rome time, UTC+1 in November). Keep CLOSE_AT in Code.gs the same.
   ENTRIES_CLOSE_AT: "2026-11-05T15:00:00+01:00",
